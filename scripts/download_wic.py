@@ -10,5 +10,8 @@ args = parser.parse_args()
 dataset = load_dataset("aps/super_glue", "wic", split=args.split)
 frame = pd.DataFrame(dataset)
 if args.limit: frame = frame.head(args.limit)
-frame.rename(columns={"sentence1": "sentence1", "sentence2": "sentence2", "word": "target_word", "label": "label"})[["sentence1", "sentence2", "target_word", "label"]].to_csv(Path(args.output), index=False)
+frame.rename(columns={"word": "target_word"})[[
+    "sentence1", "sentence2", "target_word", "label",
+    "start1", "end1", "start2", "end2",
+]].to_csv(Path(args.output), index=False)
 print(f"Wrote {len(frame)} examples to {args.output}")

@@ -44,7 +44,10 @@ def pairs(args: argparse.Namespace) -> None:
     frame = pd.read_csv(args.input); required = {"sentence1", "sentence2", "target_word", "label"}
     if not required <= set(frame): raise ValueError(f"Input must contain {sorted(required)}.")
     resources = load_bert(args.model, args.device); layers = parse_layers(args.layers, resources.model.config.num_hidden_layers)
-    metrics = evaluate_pairs(resources, frame.sentence1.tolist(), frame.sentence2.tolist(), frame.target_word.tolist(), frame.label.to_numpy(), layers, args.seed)
+    span_columns = {"start1", "end1", "start2", "end2"}
+    first_spans = list(zip(frame.start1.astype(int), frame.end1.astype(int))) if span_columns <= set(frame) else None
+    second_spans = list(zip(frame.start2.astype(int), frame.end2.astype(int))) if span_columns <= set(frame) else None
+    metrics = evaluate_pairs(resources, frame.sentence1.tolist(), frame.sentence2.tolist(), frame.target_word.tolist(), frame.label.to_numpy(), layers, args.seed, first_spans, second_spans)
     output = Path(args.output_dir); write_metrics(metrics, output / "metrics.json"); save_pair_plot(metrics, output / "layer_summary.png"); print(f"Wrote pairwise benchmark to {output}")
 
 def build_parser() -> argparse.ArgumentParser:

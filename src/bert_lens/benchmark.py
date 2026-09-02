@@ -22,10 +22,10 @@ class PairMetric:
 def _cosine(left: np.ndarray, right: np.ndarray) -> np.ndarray:
     return (left * right).sum(1) / (np.linalg.norm(left, axis=1) * np.linalg.norm(right, axis=1) + 1e-12)
 
-def evaluate_pairs(resources: BertResources, first: list[str], second: list[str], words: list[str], labels: np.ndarray, layers: list[int], seed: int) -> list[PairMetric]:
+def evaluate_pairs(resources: BertResources, first: list[str], second: list[str], words: list[str], labels: np.ndarray, layers: list[int], seed: int, first_spans: list[tuple[int, int]] | None = None, second_spans: list[tuple[int, int]] | None = None) -> list[PairMetric]:
     """Evaluate whether contextual similarity predicts same-sense labels without training a probe."""
-    left = target_embeddings(resources, first, words, layers)
-    right = target_embeddings(resources, second, words, layers)
+    left = target_embeddings(resources, first, words, layers, first_spans)
+    right = target_embeddings(resources, second, words, layers, second_spans)
     folds = StratifiedKFold(n_splits=min(5, int(np.bincount(labels).min())), shuffle=True, random_state=seed)
     results = []
     for layer in layers:
