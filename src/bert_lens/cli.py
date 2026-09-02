@@ -4,6 +4,7 @@ import argparse, json
 from pathlib import Path
 import pandas as pd
 from bert_lens.analysis import attention_matrix, as_dicts, probe_analysis, save_attention, save_probe_plot, save_projection, sense_analysis
+from bert_lens.benchmark import evaluate_pairs, save_pair_plot, write_metrics
 from bert_lens.embeddings import cls_embeddings, target_embeddings
 from bert_lens.model import load_bert
 from bert_lens.tokenization import inspect_text, records_as_dicts
@@ -39,12 +40,20 @@ def probe(args: argparse.Namespace) -> None:
     vectors = cls_embeddings(resources, frame.sentence.tolist(), layers); metrics = [probe_analysis(vectors[x], frame.label.to_numpy(), x, args.seed) for x in layers]; output = Path(args.output_dir); output.mkdir(parents=True, exist_ok=True)
     (output / "metrics.json").write_text(json.dumps(as_dicts(metrics), indent=2)); save_probe_plot(metrics, output / "accuracy_by_layer.png"); print(f"Wrote probe analysis to {output}")
 
+def pairs(args: argparse.Namespace) -> None:
+    frame = pd.read_csv(args.input); required = {"sentence1", "sentence2", "target_word", "label"}
+    if not required <= set(frame): raise ValueError(f"Input must contain {sorted(required)}.")
+    resources = load_bert(args.model, args.device); layers = parse_layers(args.layers, resources.model.config.num_hidden_layers)
+    metrics = evaluate_pairs(resources, frame.sentence1.tolist(), frame.sentence2.tolist(), frame.target_word.tolist(), frame.label.to_numpy(), layers, args.seed)
+    output = Path(args.output_dir); write_metrics(metrics, output / "metrics.json"); save_pair_plot(metrics, output / "layer_summary.png"); print(f"Wrote pairwise benchmark to {output}")
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Inspect BERT representations from tokens to meaning."); subs = parser.add_subparsers(dest="command", required=True)
     p = subs.add_parser("tokenize"); p.add_argument("--text", required=True); p.add_argument("--target-word"); p.add_argument("--output", default="reports/tokenization.json"); shared(p); p.set_defaults(handler=tokenize)
     p = subs.add_parser("attention"); p.add_argument("--text", required=True); p.add_argument("--layer", type=int, required=True); p.add_argument("--head", type=int, required=True); p.add_argument("--output", default="reports/attention.png"); shared(p); p.set_defaults(handler=attention)
     p = subs.add_parser("senses"); p.add_argument("--input", default="data/polysemy_examples.csv"); p.add_argument("--target-word", required=True); p.add_argument("--layers", default="0,4,8,12"); p.add_argument("--clusters", type=int); p.add_argument("--output-dir", default="reports/polysemy"); shared(p); p.set_defaults(handler=senses)
     p = subs.add_parser("probe"); p.add_argument("--input", default="data/probe_length_examples.csv"); p.add_argument("--layers", default="0,4,8,12"); p.add_argument("--output-dir", default="reports/probe"); shared(p); p.set_defaults(handler=probe)
+    p = subs.add_parser("pairs", help="Evaluate same-sense prediction from contextual similarity."); p.add_argument("--input", required=True); p.add_argument("--layers", default="all"); p.add_argument("--output-dir", default="reports/wic"); shared(p); p.set_defaults(handler=pairs)
     return parser
 
 def main() -> None:
